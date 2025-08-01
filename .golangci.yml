@@ -1,0 +1,53 @@
+# filepath: .golangci.yml
+run:
+  skip-dirs:
+    - migrations
+    - vendor
+  concurrency: 4
+
+linters-settings:
+  golint:
+    min-confidence: 0.8 
+
+  goimports:
+    local-prefixes: github.com/netwalker2000/finflow-wallet 
+
+  staticcheck:
+    checks: ["all"] 
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+
+  unparam:
+    check-exported: false 
+
+linters:
+  disable-all: true 
+  enable: 
+    - gofmt
+    - goimports
+    - golint
+    - govet
+    - staticcheck
+    - errcheck
+    - unparam
+    - gosimple
+    - unused
+    - typecheck
+    - gosec
+
+issues:
+  exclude-rules:
+    - path: _test\.go$ 
+      linters:
+        - golint
+        - gosec
+    - text: "should have a package comment" 
+      linters:
+        - golint
+      source: "^package main$" 
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
