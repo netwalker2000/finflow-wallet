@@ -85,8 +85,8 @@ The core entities and their relationships are as follows:
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-github-repo-link>
-    cd wallet-app
+    git clone git@github.com:netwalker2000/finflow-wallet.git
+    cd finflow-wallet
     ```
 2.  **Start PostgreSQL using Docker Compose:**
     ```bash
