@@ -24,13 +24,15 @@ linters:
     - goimports
     - govet
     - staticcheck
-    - errcheck
     - unparam
     - gosimple
     - unused
     - typecheck
     - gosec
-    - revive
+    - nakedret
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
 
 issues:
   exclude-dirs: 

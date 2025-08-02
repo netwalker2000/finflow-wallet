@@ -14,33 +14,33 @@ import (
 )
 
 // UserRepository implements repository.UserRepository for PostgreSQL.
-// Renamed from PostgresUserRepository to UserRepository to avoid stuttering.
 type UserRepository struct {
-	db *sqlx.DB
+	// No longer holds *sqlx.DB as methods receive DBExecutor directly
 }
 
 // NewUserRepository creates a new UserRepository.
-// Renamed from NewPostgresUserRepository to NewUserRepository.
+// The db parameter is not stored in the struct, but passed to methods.
+// This constructor is now mainly for type assertion and consistency.
 func NewUserRepository(db *sqlx.DB) repository.UserRepository {
-	return &UserRepository{db: db}
+	return &UserRepository{}
 }
 
-// CreateUser inserts a new user into the database.
-func (r *UserRepository) CreateUser(ctx context.Context, user *domain.User) error {
+// CreateUser inserts a new user into the database using the provided DBExecutor.
+func (r *UserRepository) CreateUser(ctx context.Context, q repository.DBExecutor, user *domain.User) error {
 	query := `INSERT INTO users (username, created_at, updated_at)
               VALUES ($1, $2, $3) RETURNING id`
-	err := r.db.QueryRowContext(ctx, query, user.Username, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
+	err := q.QueryRowContext(ctx, query, user.Username, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 	return nil
 }
 
-// GetUserByID retrieves a user by their ID.
-func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {
+// GetUserByID retrieves a user by their ID using the provided DBExecutor.
+func (r *UserRepository) GetUserByID(ctx context.Context, q repository.DBExecutor, id int64) (*domain.User, error) {
 	var user domain.User
 	query := `SELECT id, username, created_at, updated_at FROM users WHERE id = $1`
-	err := r.db.GetContext(ctx, &user, query, id)
+	err := q.GetContext(ctx, &user, query, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, util.ErrNotFound
@@ -50,11 +50,11 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.Use
 	return &user, nil
 }
 
-// GetUserByUsername retrieves a user by their username.
-func (r *UserRepository) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
+// GetUserByUsername retrieves a user by their username using the provided DBExecutor.
+func (r *UserRepository) GetUserByUsername(ctx context.Context, q repository.DBExecutor, username string) (*domain.User, error) {
 	var user domain.User
 	query := `SELECT id, username, created_at, updated_at FROM users WHERE username = $1`
-	err := r.db.GetContext(ctx, &user, query, username)
+	err := q.GetContext(ctx, &user, query, username)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, util.ErrNotFound

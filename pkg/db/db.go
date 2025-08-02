@@ -45,30 +45,3 @@ func NewPostgresDB(cfg Config) (*sqlx.DB, error) {
 
 	return db, nil
 }
-
-// BeginTx starts a new transaction.
-// It's a helper function to ensure all repository operations can be performed within a transaction.
-func BeginTx(ctx context.Context, db *sqlx.DB) (*sqlx.Tx, error) {
-	tx, err := db.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	return tx, nil
-}
-
-// RollbackTx is a helper function to rollback a transaction.
-func RollbackTx(tx *sqlx.Tx) {
-	if err := tx.Rollback(); err != nil {
-		// Log the error, but don't return it as it's typically called in a defer
-		// and the original error from the transaction operation is more important.
-		fmt.Printf("Error rolling back transaction: %v\n", err)
-	}
-}
-
-// CommitTx is a helper function to commit a transaction.
-func CommitTx(tx *sqlx.Tx) error {
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-	return nil
-}

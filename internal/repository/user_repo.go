@@ -9,10 +9,10 @@ import (
 
 // UserRepository defines the interface for user data operations.
 type UserRepository interface {
-	// CreateUser adds a new user to the database.
-	CreateUser(ctx context.Context, user *domain.User) error
-	// GetUserByID retrieves a user by their ID.
-	GetUserByID(ctx context.Context, id int64) (*domain.User, error)
-	// GetUserByUsername retrieves a user by their username.
-	GetUserByUsername(ctx context.Context, username string) (*domain.User, error)
+	// CreateUser adds a new user to the database using the provided DBExecutor.
+	CreateUser(ctx context.Context, q DBExecutor, user *domain.User) error
+	// GetUserByID retrieves a user by their ID using the provided DBExecutor.
+	GetUserByID(ctx context.Context, q DBExecutor, id int64) (*domain.User, error)
+	// GetUserByUsername retrieves a user by their username using the provided DBExecutor.
+	GetUserByUsername(ctx context.Context, q DBExecutor, username string) (*domain.User, error)
 }
