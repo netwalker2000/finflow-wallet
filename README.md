@@ -52,20 +52,20 @@ The application follows a layered architecture to ensure separation of concerns,
 The core entities and their relationships are as follows:
 
 *   **User:** Represents a user of the wallet system.
-    *   `id` (UUID, PK)
+    *   `id` (PK，auto-increase integer)
     *   `username` (VARCHAR, UNIQUE)
     *   `created_at`, `updated_at` (TIMESTAMPTZ)
 *   **Wallet:** Represents a user's wallet.
-    *   `id` (UUID, PK)
-    *   `user_id` (UUID, FK to `users.id`)
+    *   `id` (PK，auto-increase integer)
+    *   `user_id` (FK to `users.id`)
     *   `currency` (VARCHAR, e.g., 'USD', 'FIAT')
-    *   `balance` (NUMERIC(20, 8), for high precision)
+    *   `balance` (NUMERIC(20, 4), for high precision)
     *   `created_at`, `updated_at` (TIMESTAMPTZ)
 *   **Transaction:** Records all financial movements.
-    *   `id` (UUID, PK)
-    *   `from_wallet_id` (UUID, FK to `wallets.id`, NULLABLE)
-    *   `to_wallet_id` (UUID, FK to `wallets.id`, NULLABLE)
-    *   `amount` (NUMERIC(20, 8))
+    *   `id` (PK，auto-increase integer)
+    *   `from_wallet_id` (FK to `wallets.id`, NULLABLE)
+    *   `to_wallet_id` (FK to `wallets.id`, NULLABLE)
+    *   `amount` (NUMERIC(20, 4))
     *   `currency` (VARCHAR)
     *   `type` (VARCHAR, e.g., 'DEPOSIT', 'WITHDRAWAL', 'TRANSFER')
     *   `status` (VARCHAR, e.g., 'COMPLETED')
@@ -104,3 +104,29 @@ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@lat
 
 # Run migrations
 migrate -path migrations -database "postgres://user:password@localhost:5432/walletdb?sslmode=disable" up
+
+# Insert test data
+docker exec -i finflow_postgres psql -U user -d walletdb < migrations/000001_insert_test_data.sql
+
+# query test data
+docker exec -it finflow_postgres psql -U user -d walletdb
+input sql and query then \q to quit
+```
+
+## Design Decisions & Rationale
+
+*   **Layered Architecture:** Adopted a Handler-Service-Repository pattern to promote modularity, separation of concerns, and testability.
+    *   **Handler:** Focuses on HTTP concerns (request/response).
+    *   **Service:** Encapsulates business logic and transaction management.
+    *   **Repository:** Handles data persistence logic.
+*   **Concurrency Control:**
+    *   Database transactions (`sql.Tx`) are used for all money-altering operations (deposit, withdraw, transfer) to guarantee atomicity.
+*   **Error Handling:** Custom error types (`util.ErrInsufficientFunds`, `util.ErrNotFound`, etc.) are defined to provide specific business context. Errors are wrapped using `fmt.Errorf("%w", err)` to maintain a clear error chain, aiding debugging. A centralized error handling middleware or function in the API layer translates these internal errors into appropriate HTTP responses.
+*   **Go Generics (Go 1.23.0):**
+    *   Generics were utilized for `PaginatedResponse[T any]` to provide a reusable structure for API responses that include lists of items with pagination metadata. This avoids code duplication for different list types.
+*   **`BIGSERIAL` for Primary Keys:** Chosen over UUIDs for primary keys (`id` columns) to optimize database performance, especially for insertions and indexing. `BIGSERIAL` provides auto-incrementing, large integer IDs, which offer better spatial locality and smaller index sizes compared to random UUIDs, crucial for high-volume financial data.
+*   **`TIMESTAMPTZ` for Timestamps:** Used `TIMESTAMPTZ` (timestamp with time zone) for all time-related columns (`created_at`, `updated_at`, `transaction_time`). This ensures that all timestamps are stored internally in UTC, providing an unambiguous and precise record of events regardless of server location or time zone settings, which is critical for auditability and consistency in financial applications.
+*   **`NUMERIC(20, 4)` for Monetary Values:**
+    *   Crucial for financial applications to avoid floating-point inaccuracies. PostgreSQL's `NUMERIC` type provides arbitrary precision arithmetic.
+    *   The `(20, 4)` precision was chosen based on the understanding that the "money" in this context primarily refers to **fiat currencies**, which typically require up to 4 decimal places for precision (e.g., in foreign exchange markets).
+    *   This configuration provides 16 digits before the decimal point (up to `9,999,999,999,999,999.9999`), offering ample scale for large fiat currency balances and transaction amounts, while being efficient in storage compared to higher precision that might be needed for cryptocurrencies.
