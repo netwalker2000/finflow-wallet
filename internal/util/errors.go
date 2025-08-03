@@ -14,3 +14,7 @@ var (
 	ErrDuplicateEntry     = errors.New("duplicate entry") // For cases like creating a user with existing username
 	// Add more specific errors as needed
 )
+
+func IsError(err error, target error) bool {
+	return errors.Is(err, target)
+}
