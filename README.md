@@ -303,3 +303,75 @@ curl -X POST -H "Content-Type: application/json" -d '{"from_wallet_id": 1, "to_w
     *   Crucial for financial applications to avoid floating-point inaccuracies. PostgreSQL's `NUMERIC` type provides arbitrary precision arithmetic.
     *   The `(20, 4)` precision was chosen based on the understanding that the "money" in this context primarily refers to **fiat currencies**, which typically require up to 4 decimal places for precision (e.g., in foreign exchange markets).
     *   This configuration provides 16 digits before the decimal point (up to `9,999,999,999,999,999.9999`), offering ample scale for large fiat currency balances and transaction amounts, while being efficient in storage compared to higher precision that might be needed for cryptocurrencies.
+
+## Areas for Improvement
+
+While this project provides a solid foundation, there are several areas where it could be further improved and extended:
+
+*   **Comprehensive Input Validation:** Implement more robust and centralized input validation (e.g., using a dedicated validation library like `go-playground/validator`) for all API requests to ensure data integrity and security.
+*   **Authentication and Authorization:** Integrate a proper authentication mechanism (e.g., JWT, OAuth2) and authorization (e.g., RBAC) to secure API endpoints and manage user permissions.
+*   **Rate Limiting:** Implement rate limiting to protect the API from abuse and denial-of-service attacks.
+*   **Observability:** Add metrics (e.g., Prometheus), tracing (e.g., OpenTelemetry), and more detailed structured logging to enhance monitoring and debugging capabilities in production.
+*   **Idempotency:** Implement idempotency keys for write operations (Deposit, Withdraw, Transfer) to prevent duplicate processing of requests due to network retries.
+*   **More Granular Error Handling:** Define more specific custom error types and map them to HTTP status codes for a richer API error response.
+*   **Integration Tests:** Develop a suite of integration tests that interact with a real (or test-containerized) PostgreSQL instance to verify the full stack's functionality.
+*   **Configuration Management:** Explore more advanced configuration management solutions (e.g., Viper) to support different environments (development, staging, production) and external configuration sources.
+*   **Concurrency Control:** For extremely high-volume scenarios, consider more advanced concurrency control mechanisms beyond simple database transactions, such as optimistic locking or distributed locks, though for typical loads, database transactions are sufficient.
+*   **User Management API:** Implement API endpoints for user creation, retrieval, and management, rather than assuming manual user creation.
+
+## Time Spent
+
+The development of this project involved the following time allocation:
+
+*   **August 1, 2025:**
+    *   20:30 - 22:30 (2 hours): Initial project research and understanding the assignment scope.
+*   **August 2, 2025:**
+    *   11:00 - 11:30 (0.5 hours): Communication regarding assignment scope.
+    *   14:00 - 16:00 (2 hours): Database schema design and migration scripts.
+    *   16:00 - 18:30 (2.5 hours): Initial service layer development (query operations functional, transactional operations pending).
+*   **August 3, 2025:**
+    *   10:00 - 12:30 (2.5 hours): Debugging and resolving transaction-related issues in service layer tests.
+    *   13:00 - 14:00 (1 hour): Ensuring service layer build stability and passing all unit tests.
+    *   14:00 - 15:00 (1 hour): Completion of all core code (config, app init, API handlers, main) and successful integration testing.
+    *   15:00 - 16:30 (1.5 hours): README documentation, including API endpoints and testing sections.
+
+**Total Estimated Time: 13 hours**
+
+## Features Not Implemented
+
+Due to the scope and time constraints, the following features, which are common in a production-grade wallet application, were not implemented:
+
+*   **User Management API:** No API endpoints for creating, updating, or deleting users. Users are assumed to be pre-existing or managed externally.
+*   **Advanced Currency Management:** No support for multiple currencies within a single wallet, currency conversion, or exchange rates. Each wallet is tied to a single currency.
+*   **Transaction Fees:** The current implementation does not account for any transaction fees for deposits, withdrawals, or transfers.
+*   **Soft Deletion:** Entities are not soft-deleted; they are assumed to be hard-deleted or remain in the database.
+*   **Wallet Freezing/Blocking:** No functionality to freeze or block wallets (e.g., for suspicious activity).
+*   **Audit Trails:** While transactions serve as a basic audit, a more comprehensive audit trail for all system changes (e.g., user updates, configuration changes) is not in place.
+*   **Webhooks/Notifications:** No real-time notifications (e.g., webhooks, email, SMS) for transaction events.
+*   **Scheduled Transactions:** No support for future-dated or recurring transactions.
+*   **Admin Panel/API:** No separate interfaces or APIs for administrative tasks.
+
+## How to Review the Code
+
+To effectively review the codebase, it's recommended to follow the application's layered architecture and focus on key design principles:
+
+1.  **Start with `cmd/api/main.go`:** Understand the application's entry point, how it initializes, and its graceful shutdown mechanism.
+2.  **Review `internal/app.go`:** This file orchestrates the initialization of all components (config, logger, DB, repositories, services, handlers, router). Pay attention to dependency injection.
+3.  **Examine `internal/config/config.go` and `internal/util/logger.go`:** Understand how configuration is loaded and how structured logging is set up.
+4.  **Dive into `internal/api/router.go` and `internal/api/handler/wallet.go`:**
+    *   `router.go`: See how HTTP routes are defined and mapped to handlers.
+    *   `wallet.go`: Review how requests are handled, parameters are parsed, input is validated, and service methods are called. Observe the `respondWithJSON` and `respondWithError` helpers and the error mapping logic.
+5.  **Analyze `internal/service/wallet_service.go`:** This is the core business logic layer.
+    *   Pay close attention to the transaction management (`beginTxFn`, `commitTxFn`, `rollbackTxFn`) and how it's used to ensure atomicity for deposit, withdraw, and transfer operations.
+    *   Verify the business rules (e.g., insufficient funds checks, currency matching, same wallet transfer prevention).
+    *   Review how different repository methods are orchestrated.
+6.  **Inspect `internal/repository/` and `internal/repository/postgres/`:**
+    *   `internal/repository/*.go`: Understand the repository interfaces (contracts) that define data access operations.
+    *   `internal/repository/postgres/*.go`: Review the concrete PostgreSQL implementations. Note how `sqlx.ExtContext` is used to allow repository methods to operate within an existing transaction.
+7.  **Check `pkg/db/`:** Understand the abstraction for database connection and transaction management. The `TxController` and `DBTxBeginner` interfaces are crucial for testability.
+8.  **Review `internal/util/errors.go`:** Understand the custom error types used for business logic errors.
+9.  **Examine Unit Tests (`internal/service/*_test.go`):**
+    *   See how `testify/mock` is used to mock dependencies, especially for repositories and transaction controllers.
+    *   Verify that each test case (`t.Run`) is isolated and sets up its own mocks.
+    *   Confirm that expected method calls and their arguments are asserted.
+    *   Understand how different error scenarios are tested.
