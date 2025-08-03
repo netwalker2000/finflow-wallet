@@ -1,6 +1,7 @@
-# Wallet Application Backend
+# Finflow Wallet Application Backend
 
 This project implements a centralized wallet application backend with RESTful API endpoints, as a technical assignment for Crypto.com's Bank Services - Senior Software Engineer position.
+For the name "Finflow", "Fin" stands for financial technology (which is also my major of MSc in HKUST), and "flow" stands for the dynamics of financial entities, like deposit/withdraw/transfer of wallets.
 
 ## Table of Contents
 
