@@ -44,3 +44,8 @@ func RollbackTx(tx TxController) {
 		fmt.Printf("Error rolling back transaction: %v\n", err)
 	}
 }
+
+// Define function types for dependency injection
+type BeginTxFunc func(ctx context.Context, dbConn DBTxBeginner) (TxController, error)
+type CommitTxFunc func(tx TxController) error
+type RollbackTxFunc func(tx TxController)

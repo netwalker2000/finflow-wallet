@@ -5,7 +5,7 @@
 # Define variables
 APP_NAME := wallet-app
 BUILD_DIR := bin
-MAIN_GO := cmd/api/main.go
+MAIN_GO := ./cmd/api/main.go
 TEST_COVERAGE_DIR := coverage
 
 # Default target
