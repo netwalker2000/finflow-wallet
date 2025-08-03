@@ -30,14 +30,14 @@ The application provides the following core functionalities via RESTful APIs:
 *   **Withdraw Money:** Allows users to withdraw funds from their wallets, with balance checks.
 *   **Transfer Money:** Enables users to send money to other users, ensuring atomicity and sufficient funds.
 *   **Check Wallet Balance:** Retrieves the current balance of a specified wallet.
-*   **View Transaction History:** Provides a list of all transactions for a specified wallet.
+*   **View Transaction History:** Provides a list of all transactions for a specified wallet with pagination.
 
 ## Technology Stack
 
 *   **Language:** Go (version 1.23.0)
 *   **Database:** PostgreSQL
 *   **HTTP Framework:** `net/http` (standard library) 
-*   **Database ORM/Client:** `github.com/jmoiron/sqlx` (for simplified SQL operations and struct scanning)
+*   **Database Client:** `github.com/jmoiron/sqlx` (for simplified SQL operations and struct scanning)
 *   **Containerization:** Docker, Docker Compose
 
 ## Architecture
@@ -54,12 +54,12 @@ The core entities and their relationships are as follows:
 
 *   **User:** Represents a user of the wallet system.
     *   `id` (PK，auto-increase integer)
-    *   `username` (VARCHAR, UNIQUE)
+    *   `username` (VARCHAR)
     *   `created_at`, `updated_at` (TIMESTAMPTZ)
 *   **Wallet:** Represents a user's wallet.
     *   `id` (PK，auto-increase integer)
     *   `user_id` (FK to `users.id`)
-    *   `currency` (VARCHAR, e.g., 'USD', 'FIAT')
+    *   `currency` (VARCHAR, e.g., 'USD')
     *   `balance` (NUMERIC(20, 4), for high precision)
     *   `created_at`, `updated_at` (TIMESTAMPTZ)
 *   **Transaction:** Records all financial movements.
@@ -113,6 +113,178 @@ docker exec -i finflow_postgres psql -U user -d walletdb < migrations/000001_ins
 docker exec -it finflow_postgres psql -U user -d walletdb
 input sql and query then \q to quit
 ```
+
+### Run the Application
+
+```bash
+make all
+go run cmd/api/main.go
+```
+
+## API Endpoints
+
+The application exposes the following RESTful API endpoints:
+
+### Wallet Operations
+
+*   **Deposit Money**
+    *   **Endpoint:** `POST /wallets/{walletID}/deposit`
+    *   **Description:** Deposits a specified amount into the given wallet.
+    *   **Path Parameters:**
+        *   `walletID` (integer): The ID of the wallet to deposit into.
+    *   **Request Body (JSON):**
+        ```json
+        {
+            "amount": "100.00",
+            "currency": "USD"
+        }
+        ```
+    *   **Successful Response (200 OK):**
+        ```json
+        {
+            "message": "Deposit successful",
+            "wallet_id": 1,
+            "new_balance": "600.00",
+            "transaction_id": 101
+        }
+        ```
+
+*   **Withdraw Money**
+    *   **Endpoint:** `POST /wallets/{walletID}/withdraw`
+    *   **Description:** Withdraws a specified amount from the given wallet, subject to balance checks.
+    *   **Path Parameters:**
+        *   `walletID` (integer): The ID of the wallet to withdraw from.
+    *   **Request Body (JSON):**
+        ```json
+        {
+            "amount": "50.00",
+            "currency": "USD"
+        }
+        ```
+    *   **Successful Response (200 OK):**
+        ```json
+        {
+            "message": "Withdrawal successful",
+            "wallet_id": 1,
+            "new_balance": "550.00",
+            "transaction_id": 102
+        }
+        ```
+    *   **Error Response (402 Payment Required):** If insufficient funds.
+
+*   **Get Wallet Balance**
+    *   **Endpoint:** `GET /wallets/{walletID}/balance`
+    *   **Description:** Retrieves the current balance of a specific wallet.
+    *   **Path Parameters:**
+        *   `walletID` (integer): The ID of the wallet.
+    *   **Successful Response (200 OK):**
+        ```json
+        {
+            "wallet_id": 1,
+            "balance": "550.00",
+            "currency": "USD"
+        }
+        ```
+    *   **Error Response (404 Not Found):** If wallet does not exist.
+
+*   **Get Transaction History**
+    *   **Endpoint:** `GET /wallets/{walletID}/transactions`
+    *   **Description:** Retrieves a paginated list of transactions for a specific wallet.
+    *   **Path Parameters:**
+        *   `walletID` (integer): The ID of the wallet.
+    *   **Query Parameters:**
+        *   `limit` (integer, optional): Maximum number of transactions to return (default: 10).
+        *   `offset` (integer, optional): Number of transactions to skip (default: 0).
+    *   **Successful Response (200 OK):**
+        ```json
+        {
+            "data": [
+                {
+                    "id": 102,
+                    "from_wallet_id": 1,
+                    "to_wallet_id": null,
+                    "amount": "50.00",
+                    "currency": "USD",
+                    "type": "WITHDRAWAL",
+                    "status": "COMPLETED",
+                    "transaction_time": "2025-08-03T10:00:00Z",
+                    "description": null,
+                    "created_at": "2025-08-03T10:00:00Z"
+                },
+                {
+                    "id": 101,
+                    "from_wallet_id": null,
+                    "to_wallet_id": 1,
+                    "amount": "100.00",
+                    "currency": "USD",
+                    "type": "DEPOSIT",
+                    "status": "COMPLETED",
+                    "transaction_time": "2025-08-03T09:00:00Z",
+                    "description": null,
+                    "created_at": "2025-08-03T09:00:00Z"
+                }
+            ],
+            "limit": 10,
+            "offset": 0
+        }
+        ```
+    *   **Error Response (404 Not Found):** If wallet does not exist.
+
+### Transfer Operations
+
+*   **Transfer Money**
+    *   **Endpoint:** `POST /transfers`
+    *   **Description:** Transfers a specified amount from one wallet to another. This is an atomic operation.
+    *   **Request Body (JSON):**
+        ```json
+        {
+            "from_wallet_id": 1,
+            "to_wallet_id": 2,
+            "amount": "25.00",
+            "currency": "USD"
+        }
+        ```
+    *   **Successful Response (200 OK):**
+        ```json
+        {
+            "message": "Transfer successful",
+            "transaction_id": 103,
+            "from_wallet_new_balance": "525.00",
+            "to_wallet_new_balance": "25.00"
+        }
+        ```
+    *   **Error Response (400 Bad Request):** For invalid input, same wallet transfer, or currency mismatch.
+    *   **Error Response (402 Payment Required):** If insufficient funds in the source wallet.
+    *   **Error Response (404 Not Found):** If either wallet does not exist.
+
+---
+
+## Testing
+
+The project includes comprehensive unit tests for the core business logic and repository layers, ensuring correctness and robustness.
+
+### How to Run Tests
+
+To run all unit tests:
+
+```bash
+go test ./...
+```
+
+To run the integtion test
+```bash
+curl http://localhost:8080/wallets/1/balance
+
+curl http://localhost:8080/wallets/1/transactions
+
+curl -X POST -H "Content-Type: application/json" -d '{"amount": "100.00", "currency": "USD"}' http://localhost:8080/wallets/1/deposit
+
+curl -X POST -H "Content-Type: application/json" -d '{"amount": "50.00", "currency": "USD"}' http://localhost:8080/wallets/1/withdraw
+
+
+curl -X POST -H "Content-Type: application/json" -d '{"from_wallet_id": 1, "to_wallet_id": 2, "amount": "25.00", "currency": "USD"}' http://localhost:8080/transfers
+```
+
 
 ## Design Decisions & Rationale
 
