@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
@@ -13,6 +14,8 @@ import (
 	"finflow-wallet/internal/service"
 	"finflow-wallet/internal/util" // For custom errors
 )
+
+const DefaultTimeout = 5 * time.Second
 
 // WalletHandler handles HTTP requests related to wallet operations.
 type WalletHandler struct {

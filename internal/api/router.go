@@ -16,11 +16,11 @@ func NewRouter(walletHandler *handler.WalletHandler, logger *slog.Logger) http.H
 	r := chi.NewRouter()
 
 	// Global middlewares
-	r.Use(middleware.RequestID) // Add a request ID to the context
-	r.Use(middleware.RealIP)    // Use the real IP address
-	r.Use(middleware.Logger)    // Log HTTP requests
-	r.Use(middleware.Recoverer) // Recover from panics and return 500
-	//r.Use(middleware.Timeout(handler.DefaultTimeout)) // Set a default timeout for requests (define DefaultTimeout in handler)
+	r.Use(middleware.RequestID)                       // Add a request ID to the context
+	r.Use(middleware.RealIP)                          // Use the real IP address
+	r.Use(middleware.Logger)                          // Log HTTP requests
+	r.Use(middleware.Recoverer)                       // Recover from panics and return 500
+	r.Use(middleware.Timeout(handler.DefaultTimeout)) // Set a default timeout for requests (define DefaultTimeout in handler)
 
 	// Health check endpoint
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
