@@ -151,6 +151,12 @@ The application exposes the following RESTful API endpoints:
             "transaction_id": 101
         }
         ```
+    *   **Error Response:** 
+        * If wallet does not exist - "Resource not found"
+        * If ID input format error - "invalid input provided"
+        * If currency mismatch - "wallet currency mismatch"
+        * If amount is not bigger than 0 - "invalid input provided"
+
 
 *   **Withdraw Money**
     *   **Endpoint:** `POST /wallets/{walletID}/withdraw`
@@ -173,7 +179,12 @@ The application exposes the following RESTful API endpoints:
             "transaction_id": 102
         }
         ```
-    *   **Error Response (402 Payment Required):** If insufficient funds.
+    *   **Error Response:** 
+        * If wallet does not exist - "Resource not found"
+        * If ID input format error - "invalid input provided"
+        * If currency mismatch - "wallet currency mismatch"
+        * If amount is not bigger than 0 - "invalid input provided"
+        * If insufficient funds - "Insufficient funds"
 
 *   **Get Wallet Balance**
     *   **Endpoint:** `GET /wallets/{walletID}/balance`
@@ -260,9 +271,13 @@ The application exposes the following RESTful API endpoints:
             "to_wallet_new_balance": "25.00"
         }
         ```
-    *   **Error Response (400 Bad Request):** For invalid input, same wallet transfer, or currency mismatch.
-    *   **Error Response (402 Payment Required):** If insufficient funds in the source wallet.
-    *   **Error Response (404 Not Found):** If either wallet does not exist.
+    *   **Error Response:** 
+        * If wallet does not exist - "Resource not found"
+        * If ID input format error - "invalid input provided"
+        * If same wallet transfer - "Cannot transfer to the same wallet"
+        * If currency mismatch - "wallet currency mismatch"
+        * If insufficient funds in the source wallet - "Insufficient funds"
+        * If amount is not bigger than 0 - "invalid input provided"
 
 ---
 
