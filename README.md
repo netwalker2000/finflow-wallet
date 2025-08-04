@@ -112,6 +112,9 @@ docker exec -i finflow_postgres psql -U user -d walletdb < migrations/000001_ins
 # query test data
 docker exec -it finflow_postgres psql -U user -d walletdb
 input sql and query then \q to quit
+
+# clean data and tables when you want to reset the test
+migrate -path migrations -database "postgres://user:password@localhost:5432/walletdb?sslmode=disable" down
 ```
 
 ### Run the Application
@@ -185,7 +188,9 @@ The application exposes the following RESTful API endpoints:
             "currency": "USD"
         }
         ```
-    *   **Error Response (404 Not Found):** If wallet does not exist.
+    *   **Error Response:** 
+        * If wallet does not exist - "Resource not found"
+        * If ID input format error - "invalid input provided"
 
 *   **Get Transaction History**
     *   **Endpoint:** `GET /wallets/{walletID}/transactions`
@@ -228,7 +233,9 @@ The application exposes the following RESTful API endpoints:
             "offset": 0
         }
         ```
-    *   **Error Response (404 Not Found):** If wallet does not exist.
+    *   **Error Response:** 
+        * If wallet does not exist - "Resource not found"
+        * If ID input format error - "invalid input provided"
 
 ### Transfer Operations
 
