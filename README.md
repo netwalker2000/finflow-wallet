@@ -283,29 +283,79 @@ The application exposes the following RESTful API endpoints:
 
 ## Testing
 
-The project includes comprehensive unit tests for the core business logic and repository layers, ensuring correctness and robustness.
+This project prioritizes code quality and reliability through a robust testing strategy, encompassing both unit and integration tests. This ensures the core business logic functions correctly and the entire application stack behaves as expected in an end-to-end scenario.
 
-### How to Run Tests
+### Unit Tests
 
-To run all unit tests:
+Unit tests are designed to validate individual components (e.g., service methods, repository functions) in isolation. They use mocking to simulate external dependencies, ensuring focused testing of specific logic without external interference.
 
-```bash
-go test ./...
-```
+*   **Framework:** Go's built-in `testing` package, complemented by `stretchr/testify/mock` for dependency mocking.
+*   **Scope:** Core business logic within `internal/service` and `internal/repository` layers.
+*   **How to Run:**
+    ```bash
+    go test ./internal/...
+    ```
+    (This command runs all unit tests within the `internal` directory and its subdirectories.)
 
-To run the integtion test
-```bash
-curl http://localhost:8080/wallets/1/balance
+### Integration Tests
 
-curl http://localhost:8080/wallets/1/transactions
+Integration tests verify the interaction between different components and external services (like the database) as a complete system. They simulate real API requests, providing confidence in the application's end-to-end functionality.
 
-curl -X POST -H "Content-Type: application/json" -d '{"amount": "100.00", "currency": "USD"}' http://localhost:8080/wallets/1/deposit
+#### Automated Integration Tests
 
-curl -X POST -H "Content-Type: application/json" -d '{"amount": "50.00", "currency": "USD"}' http://localhost:8080/wallets/1/withdraw
+These tests spin up an in-memory HTTP server and interact with a dedicated test database, providing a fast and reliable way to validate the full application stack.
 
+*   **Framework:** Go's built-in `testing` package, `net/http/httptest` for the in-memory server, and `stretchr/testify/assert` for comprehensive assertions.
+*   **Scope:** HTTP API endpoints, service layer, repository layer, and database interactions.
+*   **Environment Setup (Crucial Pre-requisites):**
+    Before running automated integration tests, ensure a dedicated PostgreSQL test database is set up and migrated. This guarantees a clean and predictable state for each test run.
+    1.  **Start PostgreSQL:** Ensure your PostgreSQL container (e.g., via `docker-compose up -d postgres`) is running.
+    2.  **Create Test Database:** Connect to your PostgreSQL instance and create a separate database for testing. Replace `user` and `password` with your actual credentials.
+        ```bash
+        docker exec -it finflow_postgres psql -U user -d postgres -c "CREATE DATABASE walletdb_test;"
+        ```
+    3.  **Run Migrations:** Apply database migrations to the newly created test database.
+        ```bash
+        migrate -path migrations -database "postgres://user:password@localhost:5432/walletdb_test?sslmode=disable" up
+        ```
+    4.  **Set Environment Variables:** Ensure the following environment variables are set to point to your test database.
+        ```bash
+        export DB_HOST=localhost
+        export DB_PORT=5432
+        export DB_USER=user
+        export DB_PASSWORD=password
+        export DB_NAME=walletdb_test
+        export DB_SSLMODE=disable
+        ```
+*   **How to Run:**
+    ```bash
+    go test ./internal/api -v -run Integration
+    ```
+    (The `-run Integration` flag specifically targets the automated integration tests.)
 
-curl -X POST -H "Content-Type: application/json" -d '{"from_wallet_id": 1, "to_wallet_id": 2, "amount": "25.00", "currency": "USD"}' http://localhost:8080/transfers
-```
+#### Manual/Ad-hoc Integration Tests
+
+For quick functional checks or debugging, you can interact with the running application directly using `curl` or similar tools.
+
+*   **Tool:** `curl` (command-line tool).
+*   **Scope:** Basic API functionality verification against a live running instance.
+*   **Examples (assuming the application is running on `http://localhost:8080`):**
+    ```bash
+    # Get wallet balance
+    curl http://localhost:8080/wallets/1/balance
+
+    # Deposit money
+    curl -X POST -H "Content-Type: application/json" -d '{"amount": "100.00", "currency": "USD"}' http://localhost:8080/wallets/1/deposit
+
+    # Withdraw money
+    curl -X POST -H "Content-Type: application/json" -d '{"amount": "50.00", "currency": "USD"}' http://localhost:8080/wallets/1/withdraw
+
+    # Transfer money
+    curl -X POST -H "Content-Type: application/json" -d '{"from_wallet_id": 1, "to_wallet_id": 2, "amount": "25.00", "currency": "USD"}' http://localhost:8080/transfers
+
+    # Get transaction history
+    curl http://localhost:8080/wallets/1/transactions
+    ```
 
 
 ## Design Decisions & Rationale
