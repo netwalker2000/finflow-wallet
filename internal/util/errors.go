@@ -12,7 +12,7 @@ var (
 	ErrWalletNotFound     = errors.New("wallet not found")
 	ErrUserNotFound       = errors.New("user not found")
 	ErrDuplicateEntry     = errors.New("duplicate entry") // For cases like creating a user with existing username
-	// Add more specific errors as needed
+	ErrCurrencyMismatch   = errors.New("wallet currency mismatch")
 )
 
 func IsError(err error, target error) bool {

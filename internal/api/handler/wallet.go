@@ -62,6 +62,9 @@ func (h *WalletHandler) respondWithError(w http.ResponseWriter, err error) {
 	case util.IsError(err, util.ErrSameWalletTransfer):
 		statusCode = http.StatusBadRequest
 		message = "Cannot transfer to the same wallet"
+	case util.IsError(err, util.ErrCurrencyMismatch):
+		statusCode = http.StatusBadRequest
+		message = "wallet currency mismatch"
 	// Add more specific error mappings as needed
 	default:
 		h.logger.Error("Unhandled service error", "error", err)

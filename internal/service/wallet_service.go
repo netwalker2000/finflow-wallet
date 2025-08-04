@@ -81,7 +81,7 @@ func (s *walletService) Deposit(ctx context.Context, walletID int64, amount deci
 		return nil, nil, fmt.Errorf("deposit: failed to get wallet %d: %w", walletID, err)
 	}
 	if wallet.Currency != currency {
-		return nil, nil, fmt.Errorf("deposit: currency mismatch, expected %s but got %s", wallet.Currency, currency)
+		return nil, nil, util.ErrCurrencyMismatch
 	}
 
 	if err := s.walletRepo.UpdateWalletBalance(ctx, txExecutor, walletID, amount); err != nil {
@@ -130,7 +130,7 @@ func (s *walletService) Withdraw(ctx context.Context, walletID int64, amount dec
 		return nil, nil, fmt.Errorf("withdraw: failed to get wallet %d: %w", walletID, err)
 	}
 	if wallet.Currency != currency {
-		return nil, nil, fmt.Errorf("withdraw: currency mismatch, expected %s but got %s", wallet.Currency, currency)
+		return nil, nil, util.ErrCurrencyMismatch
 	}
 
 	if wallet.Balance.LessThan(amount) {
@@ -182,7 +182,7 @@ func (s *walletService) Transfer(ctx context.Context, fromWalletID, toWalletID i
 		return nil, nil, nil, fmt.Errorf("transfer: failed to get source wallet %d: %w", fromWalletID, err)
 	}
 	if fromWallet.Currency != currency {
-		return nil, nil, nil, fmt.Errorf("transfer: source wallet currency mismatch, expected %s but got %s", fromWallet.Currency, currency)
+		return nil, nil, nil, util.ErrCurrencyMismatch
 	}
 
 	toWallet, err := s.walletRepo.GetWalletByID(ctx, txExecutor, toWalletID)
@@ -190,7 +190,7 @@ func (s *walletService) Transfer(ctx context.Context, fromWalletID, toWalletID i
 		return nil, nil, nil, fmt.Errorf("transfer: failed to get destination wallet %d: %w", toWalletID, err)
 	}
 	if toWallet.Currency != currency {
-		return nil, nil, nil, fmt.Errorf("transfer: destination wallet currency mismatch, expected %s but got %s", toWallet.Currency, currency)
+		return nil, nil, nil, util.ErrCurrencyMismatch
 	}
 
 	if fromWallet.Balance.LessThan(amount) {

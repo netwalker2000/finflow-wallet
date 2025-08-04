@@ -341,8 +341,7 @@ func TestDeposit(t *testing.T) {
 
 		resWallet, resTx, err := service.Deposit(ctx, walletID, amount, currency)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "currency mismatch")
+		assert.ErrorIs(t, err, util.ErrCurrencyMismatch)
 		assert.Nil(t, resWallet)
 		assert.Nil(t, resTx)
 
@@ -593,8 +592,7 @@ func TestWithdraw(t *testing.T) {
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "currency mismatch")
+		assert.ErrorIs(t, err, util.ErrCurrencyMismatch)
 		assert.Nil(t, resWallet)
 		assert.Nil(t, resTx)
 
@@ -1058,8 +1056,7 @@ func TestTransfer(t *testing.T) {
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "source wallet currency mismatch")
+		assert.ErrorIs(t, err, util.ErrCurrencyMismatch)
 		assert.Nil(t, resFromWallet)
 		assert.Nil(t, resToWallet)
 		assert.Nil(t, resTx)
@@ -1116,8 +1113,7 @@ func TestTransfer(t *testing.T) {
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "destination wallet currency mismatch")
+		assert.ErrorIs(t, err, util.ErrCurrencyMismatch)
 		assert.Nil(t, resFromWallet)
 		assert.Nil(t, resToWallet)
 		assert.Nil(t, resTx)

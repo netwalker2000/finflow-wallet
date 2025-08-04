@@ -1,5 +1,5 @@
 // internal/api/router.go
-package router
+package api
 
 import (
 	"log/slog"
