@@ -3,7 +3,7 @@
 .PHONY: lint test build all clean
 
 # Define variables
-APP_NAME := wallet-app
+APP_NAME := finflow-wallet
 BUILD_DIR := bin
 MAIN_GO := ./cmd/api/main.go
 TEST_COVERAGE_DIR := coverage
