@@ -20,7 +20,7 @@ type WalletService interface {
 	Withdraw(ctx context.Context, walletID int64, amount decimal.Decimal, currency string) (*domain.Wallet, *domain.Transaction, error)
 	Transfer(ctx context.Context, fromWalletID, toWalletID int64, amount decimal.Decimal, currency string) (*domain.Wallet, *domain.Wallet, *domain.Transaction, error)
 	GetBalance(ctx context.Context, walletID int64) (*domain.Wallet, error)
-	GetTransactionHistory(ctx context.Context, walletID int64, limit, offset int) ([]domain.Transaction, error)
+	GetTransactionHistory(ctx context.Context, walletID int64, limit, offset int) ([]domain.Transaction, int64, error)
 	CreateUserAndWallet(ctx context.Context, username, currency string) (*domain.User, *domain.Wallet, error)
 }
 
@@ -235,20 +235,24 @@ func (s *walletService) GetBalance(ctx context.Context, walletID int64) (*domain
 	return wallet, nil
 }
 
-func (s *walletService) GetTransactionHistory(ctx context.Context, walletID int64, limit, offset int) ([]domain.Transaction, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 10
-	}
-	if offset < 0 {
-		offset = 0
+// GetTransactionHistory retrieves a paginated list of transactions for a specific wallet.
+func (s *walletService) GetTransactionHistory(ctx context.Context, walletID int64, limit, offset int) ([]domain.Transaction, int64, error) {
+	// First, check if the wallet exists
+	_, err := s.walletRepo.GetWalletByID(ctx, s.dbExecutor, walletID)
+	if err != nil {
+		if util.IsError(err, util.ErrNotFound) {
+			return nil, 0, util.ErrWalletNotFound
+		}
+		return nil, 0, fmt.Errorf("failed to check wallet existence: %w", err)
 	}
 
-	// For read-only operations outside a transaction, use s.dbExecutor
-	transactions, err := s.transactionRepo.GetTransactionsByWalletID(ctx, s.dbExecutor, walletID, limit, offset)
+	// Call repository to get transactions and total count
+	transactions, totalCount, err := s.transactionRepo.GetTransactionsByWalletID(ctx, s.dbExecutor, walletID, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("get transaction history: failed to get transactions for wallet %d: %w", walletID, err)
+		return nil, 0, fmt.Errorf("failed to retrieve transaction history: %w", err)
 	}
-	return transactions, nil
+
+	return transactions, totalCount, nil
 }
 
 func (s *walletService) CreateUserAndWallet(ctx context.Context, username, currency string) (*domain.User, *domain.Wallet, error) {

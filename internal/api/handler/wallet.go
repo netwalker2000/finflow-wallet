@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
+	"finflow-wallet/internal/api/types"
 	"finflow-wallet/internal/service"
 	"finflow-wallet/internal/util" // For custom errors
 )
@@ -257,19 +258,21 @@ func (h *WalletHandler) GetTransactionHistory(w http.ResponseWriter, r *http.Req
 		offset = 0 // Default offset
 	}
 
-	transactions, err := h.service.GetTransactionHistory(r.Context(), walletID, limit, offset)
+	// Modified: GetTransactionHistory now returns total count
+	transactions, totalCount, err := h.service.GetTransactionHistory(r.Context(), walletID, limit, offset)
 	if err != nil {
 		h.respondWithError(w, err)
 		return
 	}
 
-	formattedTransactions := make([]map[string]any, len(transactions))
+	// Prepare the data for the generic PaginatedResponse
+	formattedTransactions := make([]map[string]interface{}, len(transactions))
 	for i, tx := range transactions {
-		formattedTransactions[i] = map[string]any{
+		formattedTransactions[i] = map[string]interface{}{
 			"id":               tx.ID,
 			"from_wallet_id":   tx.FromWalletID,
 			"to_wallet_id":     tx.ToWalletID,
-			"amount":           tx.Amount.StringFixed(2), // Use StringFixed for consistent formatting
+			"amount":           tx.Amount.StringFixed(2),
 			"currency":         tx.Currency,
 			"type":             tx.Type,
 			"status":           tx.Status,
@@ -279,10 +282,13 @@ func (h *WalletHandler) GetTransactionHistory(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// For simplicity, total count is not returned here, but can be added if needed
-	h.respondWithJSON(w, http.StatusOK, map[string]any{
-		"data":   formattedTransactions,
-		"limit":  limit,
-		"offset": offset,
-	})
+	// Use the generic PaginatedResponse struct and include totalCount
+	responsePayload := types.PaginatedResponse[map[string]interface{}]{
+		Data:       formattedTransactions,
+		Limit:      limit,
+		Offset:     offset,
+		TotalCount: totalCount, // <-- Pass totalCount here
+	}
+
+	h.respondWithJSON(w, http.StatusOK, responsePayload)
 }

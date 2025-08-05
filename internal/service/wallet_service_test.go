@@ -110,9 +110,10 @@ func (m *MockTransactionRepository) CreateTransaction(ctx context.Context, q rep
 	return args.Error(0)
 }
 
-func (m *MockTransactionRepository) GetTransactionsByWalletID(ctx context.Context, q repository.DBExecutor, walletID int64, limit, offset int) ([]domain.Transaction, error) {
+func (m *MockTransactionRepository) GetTransactionsByWalletID(ctx context.Context, q repository.DBExecutor, walletID int64, limit, offset int) ([]domain.Transaction, int64, error) {
 	args := m.Called(ctx, q, walletID, limit, offset)
-	return args.Get(0).([]domain.Transaction), args.Error(1)
+	// Ensure that args.Get(1) is always an int64 to prevent panic
+	return args.Get(0).([]domain.Transaction), args.Get(1).(int64), args.Error(2)
 }
 
 // MockDBBeginner is a mock implementation of db.DBTxBeginner.
@@ -195,10 +196,10 @@ func TestDeposit(t *testing.T) {
 		mockTxController.On("Commit").Return(nil).Once()
 		mockTxController.On("Rollback").Return(nil).Maybe() // Rollback might be called if Commit fails or defer runs after Commit.
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, walletID, amount).Return(nil).Once()
-		mockTransactionRepo.On("CreateTransaction", ctx, mock.Anything, mock.AnythingOfType("*domain.Transaction")).Return(nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(updatedWallet, nil).Once() // Re-fetch updated wallet
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController for transactional calls
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, walletID, amount).Return(nil).Once()
+		mockTransactionRepo.On("CreateTransaction", ctx, mockTxController, mock.AnythingOfType("*domain.Transaction")).Return(nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(updatedWallet, nil).Once() // Re-fetch updated wallet
 
 		resWallet, resTx, err := service.Deposit(ctx, walletID, amount, currency)
 
@@ -285,8 +286,8 @@ func TestDeposit(t *testing.T) {
 
 		// Set expectations for this specific test case
 		// A transaction begins, then GetWalletByID fails, so Rollback is called. Commit is NOT called.
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(nil, util.ErrNotFound).Once()
-		mockTxController.On("Rollback").Return(nil).Once() // Expect rollback to return nil
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(nil, util.ErrNotFound).Once() // Use mockTxController
+		mockTxController.On("Rollback").Return(nil).Once()                                                       // Expect rollback to return nil
 
 		resWallet, resTx, err := service.Deposit(ctx, walletID, amount, currency)
 
@@ -336,8 +337,8 @@ func TestDeposit(t *testing.T) {
 
 		// Set expectations for this specific test case
 		// A transaction begins, then currency mismatch occurs, so Rollback is called. Commit is NOT called.
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
-		mockTxController.On("Rollback").Return(nil).Once() // Expect rollback to return nil
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
+		mockTxController.On("Rollback").Return(nil).Once()                                                    // Expect rollback to return nil
 
 		resWallet, resTx, err := service.Deposit(ctx, walletID, amount, currency)
 
@@ -387,8 +388,8 @@ func TestDeposit(t *testing.T) {
 
 		// Set expectations for this specific test case
 		// A transaction begins, then UpdateWalletBalance fails, so Rollback is called. Commit is NOT called.
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, walletID, amount).Return(errors.New("db error")).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, walletID, amount).Return(errors.New("db error")).Once()
 		mockTxController.On("Rollback").Return(nil).Once() // Expect rollback to return nil
 
 		resWallet, resTx, err := service.Deposit(ctx, walletID, amount, currency)
@@ -454,10 +455,10 @@ func TestWithdraw(t *testing.T) {
 		mockTxController.On("Commit").Return(nil).Once()
 		mockTxController.On("Rollback").Return(nil).Maybe()
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, walletID, amount.Neg()).Return(nil).Once()
-		mockTransactionRepo.On("CreateTransaction", ctx, mock.Anything, mock.AnythingOfType("*domain.Transaction")).Return(nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(updatedWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, walletID, amount.Neg()).Return(nil).Once()
+		mockTransactionRepo.On("CreateTransaction", ctx, mockTxController, mock.AnythingOfType("*domain.Transaction")).Return(nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(updatedWallet, nil).Once()
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
 
@@ -539,7 +540,7 @@ func TestWithdraw(t *testing.T) {
 			},
 		)
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(nil, util.ErrNotFound).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(nil, util.ErrNotFound).Once() // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
@@ -587,7 +588,7 @@ func TestWithdraw(t *testing.T) {
 			Balance:  decimal.NewFromFloat(500.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
@@ -635,7 +636,7 @@ func TestWithdraw(t *testing.T) {
 			Balance:  decimal.NewFromFloat(20.00), // Less than amount
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
@@ -685,8 +686,8 @@ func TestWithdraw(t *testing.T) {
 			Balance:  decimal.NewFromFloat(500.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, walletID, amount.Neg()).Return(errors.New("db error")).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, walletID, amount.Neg()).Return(errors.New("db error")).Once()
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
@@ -736,9 +737,9 @@ func TestWithdraw(t *testing.T) {
 			Balance:  decimal.NewFromFloat(500.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, walletID).Return(initialWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, walletID, amount.Neg()).Return(nil).Once()
-		mockTransactionRepo.On("CreateTransaction", ctx, mock.Anything, mock.AnythingOfType("*domain.Transaction")).Return(errors.New("db error")).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, walletID).Return(initialWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, walletID, amount.Neg()).Return(nil).Once()
+		mockTransactionRepo.On("CreateTransaction", ctx, mockTxController, mock.AnythingOfType("*domain.Transaction")).Return(errors.New("db error")).Once()
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resWallet, resTx, err := service.Withdraw(ctx, walletID, amount, currency)
@@ -819,13 +820,13 @@ func TestTransfer(t *testing.T) {
 		mockTxController.On("Rollback").Return(nil).Maybe()
 
 		// First GetWalletByID for fromWallet, then for toWallet
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(initialToWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, fromWalletID, amount.Neg()).Return(nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, toWalletID, amount).Return(nil).Once()
-		mockTransactionRepo.On("CreateTransaction", ctx, mock.Anything, mock.AnythingOfType("*domain.Transaction")).Return(nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(updatedFromWallet, nil).Once() // Re-fetch
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(updatedToWallet, nil).Once()     // Re-fetch
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(initialToWallet, nil).Once()     // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, fromWalletID, amount.Neg()).Return(nil).Once()
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, toWalletID, amount).Return(nil).Once()
+		mockTransactionRepo.On("CreateTransaction", ctx, mockTxController, mock.AnythingOfType("*domain.Transaction")).Return(nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(updatedFromWallet, nil).Once() // Re-fetch
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(updatedToWallet, nil).Once()     // Re-fetch
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
 
@@ -951,7 +952,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(nil, util.ErrNotFound).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(nil, util.ErrNotFound).Once() // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1001,8 +1002,8 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(500.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(nil, util.ErrNotFound).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(nil, util.ErrNotFound).Once()    // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1051,7 +1052,7 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(500.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1107,8 +1108,8 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(100.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(initialToWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(initialToWallet, nil).Once()     // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1163,8 +1164,8 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(100.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(initialToWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(initialToWallet, nil).Once()     // Use mockTxController
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1221,9 +1222,9 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(100.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(initialToWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, fromWalletID, amount.Neg()).Return(errors.New("db error")).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(initialToWallet, nil).Once()     // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, fromWalletID, amount.Neg()).Return(errors.New("db error")).Once()
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1281,10 +1282,10 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(100.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(initialToWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, fromWalletID, amount.Neg()).Return(nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, toWalletID, amount).Return(errors.New("db error")).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(initialToWallet, nil).Once()     // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, fromWalletID, amount.Neg()).Return(nil).Once()
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, toWalletID, amount).Return(errors.New("db error")).Once()
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1341,11 +1342,11 @@ func TestTransfer(t *testing.T) {
 			Balance:  decimal.NewFromFloat(100.00),
 		}
 
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, fromWalletID).Return(initialFromWallet, nil).Once()
-		mockWalletRepo.On("GetWalletByID", ctx, mock.Anything, toWalletID).Return(initialToWallet, nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, fromWalletID, amount.Neg()).Return(nil).Once()
-		mockWalletRepo.On("UpdateWalletBalance", ctx, mock.Anything, toWalletID, amount).Return(nil).Once()
-		mockTransactionRepo.On("CreateTransaction", ctx, mock.Anything, mock.AnythingOfType("*domain.Transaction")).Return(errors.New("db error")).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, fromWalletID).Return(initialFromWallet, nil).Once() // Use mockTxController
+		mockWalletRepo.On("GetWalletByID", ctx, mockTxController, toWalletID).Return(initialToWallet, nil).Once()     // Use mockTxController
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, fromWalletID, amount.Neg()).Return(nil).Once()
+		mockWalletRepo.On("UpdateWalletBalance", ctx, mockTxController, toWalletID, amount).Return(nil).Once()
+		mockTransactionRepo.On("CreateTransaction", ctx, mockTxController, mock.AnythingOfType("*domain.Transaction")).Return(errors.New("db error")).Once()
 		mockTxController.On("Rollback").Return(nil).Once()
 
 		resFromWallet, resToWallet, resTx, err := service.Transfer(ctx, fromWalletID, toWalletID, amount, currency)
@@ -1402,7 +1403,7 @@ func TestGetBalance(t *testing.T) {
 		}
 
 		// GetBalance uses s.dbExecutor directly, not a transaction
-		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(expectedWallet, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(expectedWallet, nil).Once() // Already correct
 
 		resWallet, err := service.GetBalance(ctx, walletID)
 
@@ -1445,7 +1446,7 @@ func TestGetBalance(t *testing.T) {
 			},
 		)
 
-		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(nil, util.ErrNotFound).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(nil, util.ErrNotFound).Once() // Already correct
 
 		resWallet, err := service.GetBalance(ctx, walletID)
 
@@ -1487,7 +1488,7 @@ func TestGetBalance(t *testing.T) {
 		)
 
 		testError := errors.New("database connection lost")
-		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(nil, testError).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(nil, testError).Once() // Already correct
 
 		resWallet, err := service.GetBalance(ctx, walletID)
 
@@ -1536,20 +1537,20 @@ func TestCreateUserAndWallet(t *testing.T) {
 		)
 
 		// Expect no user to be found initially
-		mockUserRepo.On("GetUserByUsername", ctx, mock.Anything, username).Return(nil, util.ErrNotFound).Once()
+		mockUserRepo.On("GetUserByUsername", ctx, mockTxController, username).Return(nil, util.ErrNotFound).Once() // Use mockTxController
 
 		// Expect user and wallet creation
 		createdUser := &domain.User{ID: 1, Username: username}
 		createdWallet := &domain.Wallet{ID: 101, UserID: createdUser.ID, Currency: currency, Balance: decimal.Zero}
 
 		// Mock CreateUser and CreateWallet calls
-		mockUserRepo.On("CreateUser", ctx, mock.Anything, mock.AnythingOfType("*domain.User")).Run(func(args mock.Arguments) {
+		mockUserRepo.On("CreateUser", ctx, mockTxController, mock.AnythingOfType("*domain.User")).Run(func(args mock.Arguments) { // Use mockTxController
 			// Simulate setting ID on the passed user object
 			userArg := args.Get(2).(*domain.User)
 			userArg.ID = createdUser.ID
 		}).Return(nil).Once()
 
-		mockWalletRepo.On("CreateWallet", ctx, mock.Anything, mock.AnythingOfType("*domain.Wallet")).Run(func(args mock.Arguments) {
+		mockWalletRepo.On("CreateWallet", ctx, mockTxController, mock.AnythingOfType("*domain.Wallet")).Run(func(args mock.Arguments) { // Use mockTxController
 			// Simulate setting ID on the passed wallet object
 			walletArg := args.Get(2).(*domain.Wallet)
 			walletArg.ID = createdWallet.ID
@@ -1602,8 +1603,8 @@ func TestCreateUserAndWallet(t *testing.T) {
 		)
 
 		existingUser := &domain.User{ID: 1, Username: username}
-		mockUserRepo.On("GetUserByUsername", ctx, mock.Anything, username).Return(existingUser, nil).Once() // User found
-		mockTxController.On("Rollback").Return(nil).Once()                                                  // Expect rollback
+		mockUserRepo.On("GetUserByUsername", ctx, mockTxController, username).Return(existingUser, nil).Once() // Use mockTxController
+		mockTxController.On("Rollback").Return(nil).Once()                                                     // Expect rollback
 
 		resUser, resWallet, err := service.CreateUserAndWallet(ctx, username, currency)
 
@@ -1647,8 +1648,8 @@ func TestCreateUserAndWallet(t *testing.T) {
 		)
 
 		testError := errors.New("db connection failed")
-		mockUserRepo.On("GetUserByUsername", ctx, mock.Anything, username).Return(nil, testError).Once() // Simulate a DB error
-		mockTxController.On("Rollback").Return(nil).Once()                                               // Expect rollback
+		mockUserRepo.On("GetUserByUsername", ctx, mockTxController, username).Return(nil, testError).Once() // Use mockTxController
+		mockTxController.On("Rollback").Return(nil).Once()                                                  // Expect rollback
 
 		resUser, resWallet, err := service.CreateUserAndWallet(ctx, username, currency)
 
@@ -1691,10 +1692,10 @@ func TestCreateUserAndWallet(t *testing.T) {
 			},
 		)
 
-		mockUserRepo.On("GetUserByUsername", ctx, mock.Anything, username).Return(nil, util.ErrNotFound).Once()
+		mockUserRepo.On("GetUserByUsername", ctx, mockTxController, username).Return(nil, util.ErrNotFound).Once() // Use mockTxController
 		testError := errors.New("user repo save error")
-		mockUserRepo.On("CreateUser", ctx, mock.Anything, mock.AnythingOfType("*domain.User")).Return(testError).Once()
-		mockTxController.On("Rollback").Return(nil).Once() // Expect rollback
+		mockUserRepo.On("CreateUser", ctx, mockTxController, mock.AnythingOfType("*domain.User")).Return(testError).Once() // Use mockTxController
+		mockTxController.On("Rollback").Return(nil).Once()                                                                 // Expect rollback
 
 		resUser, resWallet, err := service.CreateUserAndWallet(ctx, username, currency)
 
@@ -1736,14 +1737,14 @@ func TestCreateUserAndWallet(t *testing.T) {
 			},
 		)
 
-		mockUserRepo.On("GetUserByUsername", ctx, mock.Anything, username).Return(nil, util.ErrNotFound).Once()
-		mockUserRepo.On("CreateUser", ctx, mock.Anything, mock.AnythingOfType("*domain.User")).Run(func(args mock.Arguments) {
+		mockUserRepo.On("GetUserByUsername", ctx, mockTxController, username).Return(nil, util.ErrNotFound).Once()                // Use mockTxController
+		mockUserRepo.On("CreateUser", ctx, mockTxController, mock.AnythingOfType("*domain.User")).Run(func(args mock.Arguments) { // Use mockTxController
 			userArg := args.Get(2).(*domain.User)
 			userArg.ID = 1 // Simulate ID being set
 		}).Return(nil).Once()
 		testError := errors.New("wallet repo save error")
-		mockWalletRepo.On("CreateWallet", ctx, mock.Anything, mock.AnythingOfType("*domain.Wallet")).Return(testError).Once()
-		mockTxController.On("Rollback").Return(nil).Once() // Expect rollback
+		mockWalletRepo.On("CreateWallet", ctx, mockTxController, mock.AnythingOfType("*domain.Wallet")).Return(testError).Once() // Use mockTxController
+		mockTxController.On("Rollback").Return(nil).Once()                                                                       // Expect rollback
 
 		resUser, resWallet, err := service.CreateUserAndWallet(ctx, username, currency)
 
@@ -1784,12 +1785,12 @@ func TestCreateUserAndWallet(t *testing.T) {
 			},
 		)
 
-		mockUserRepo.On("GetUserByUsername", ctx, mock.Anything, username).Return(nil, util.ErrNotFound).Once()
-		mockUserRepo.On("CreateUser", ctx, mock.Anything, mock.AnythingOfType("*domain.User")).Run(func(args mock.Arguments) {
+		mockUserRepo.On("GetUserByUsername", ctx, mockTxController, username).Return(nil, util.ErrNotFound).Once()                // Use mockTxController
+		mockUserRepo.On("CreateUser", ctx, mockTxController, mock.AnythingOfType("*domain.User")).Run(func(args mock.Arguments) { // Use mockTxController
 			userArg := args.Get(2).(*domain.User)
 			userArg.ID = 1 // Simulate ID being set
 		}).Return(nil).Once()
-		mockWalletRepo.On("CreateWallet", ctx, mock.Anything, mock.AnythingOfType("*domain.Wallet")).Run(func(args mock.Arguments) {
+		mockWalletRepo.On("CreateWallet", ctx, mockTxController, mock.AnythingOfType("*domain.Wallet")).Run(func(args mock.Arguments) { // Use mockTxController
 			walletArg := args.Get(2).(*domain.Wallet)
 			walletArg.ID = 101 // Simulate ID being set
 		}).Return(nil).Once()
@@ -1842,6 +1843,8 @@ func TestGetTransactionHistory(t *testing.T) {
 			},
 		)
 
+		// FIX: Use mockDBExecutor for the second argument
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(&domain.Wallet{ID: walletID, Balance: decimal.Zero, Currency: "USD"}, nil).Once()
 		// Corrected expectedTransactions definition
 		expectedTransactions := []domain.Transaction{
 			{
@@ -1861,15 +1864,18 @@ func TestGetTransactionHistory(t *testing.T) {
 				Currency:     "USD", // Assuming currency is "USD" for these transactions
 			},
 		}
+		expectedTotalCount := int64(len(expectedTransactions)) // FIX: Define expectedTotalCount
 
 		// GetTransactionHistory uses s.dbExecutor directly, not a transaction
-		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, limit, offset).Return(expectedTransactions, nil).Once()
+		// FIX: Add expectedTotalCount as the second return value
+		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, limit, offset).Return(expectedTransactions, expectedTotalCount, nil).Once()
 
-		resTransactions, err := service.GetTransactionHistory(ctx, walletID, limit, offset)
+		resTransactions, totalCount, err := service.GetTransactionHistory(ctx, walletID, limit, offset)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resTransactions)
 		assert.Equal(t, expectedTransactions, resTransactions)
+		assert.Equal(t, expectedTotalCount, totalCount) // FIX: Assert totalCount
 
 		mockDBBeginner.AssertNotCalled(t, "BeginTxx", mock.Anything, mock.Anything)
 		mockTxController.AssertNotCalled(t, "Commit")
@@ -1905,15 +1911,20 @@ func TestGetTransactionHistory(t *testing.T) {
 			},
 		)
 
+		// FIX: Use mockDBExecutor for the second argument
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(&domain.Wallet{ID: walletID, Balance: decimal.Zero, Currency: "USD"}, nil).Once()
 		expectedTransactions := []domain.Transaction{} // Empty slice
+		expectedTotalCount := int64(0)                 // FIX: Define expectedTotalCount
 
-		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, limit, offset).Return(expectedTransactions, nil).Once()
+		// FIX: Add expectedTotalCount as the second return value
+		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, limit, offset).Return(expectedTransactions, expectedTotalCount, nil).Once()
 
-		resTransactions, err := service.GetTransactionHistory(ctx, walletID, limit, offset)
+		resTransactions, totalCount, err := service.GetTransactionHistory(ctx, walletID, limit, offset)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resTransactions)
 		assert.Empty(t, resTransactions)
+		assert.Equal(t, expectedTotalCount, totalCount) // FIX: Assert totalCount
 
 		mockDBBeginner.AssertNotCalled(t, "BeginTxx", mock.Anything, mock.Anything)
 		mockTxController.AssertNotCalled(t, "Commit")
@@ -1950,14 +1961,17 @@ func TestGetTransactionHistory(t *testing.T) {
 		)
 
 		testError := errors.New("network error")
-		// FIX: Explicitly return a nil slice of the correct type
-		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, limit, offset).Return([]domain.Transaction(nil), testError).Once()
+		// FIX: Explicitly return a nil slice of the correct type AND an int64 for totalCount
+		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, limit, offset).Return([]domain.Transaction(nil), int64(0), testError).Once()
+		// FIX: Use mockDBExecutor for the second argument
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(&domain.Wallet{ID: walletID, Balance: decimal.Zero, Currency: "USD"}, nil).Once()
 
-		resTransactions, err := service.GetTransactionHistory(ctx, walletID, limit, offset)
+		resTransactions, totalCount, err := service.GetTransactionHistory(ctx, walletID, limit, offset)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), testError.Error())
-		assert.Nil(t, resTransactions) // resTransactions should be nil here if the repo returns nil slice and error
+		assert.Nil(t, resTransactions)        // resTransactions should be nil here if the repo returns nil slice and error
+		assert.Equal(t, int64(0), totalCount) // FIX: Assert totalCount is 0 on error
 
 		mockDBBeginner.AssertNotCalled(t, "BeginTxx", mock.Anything, mock.Anything)
 		mockTxController.AssertNotCalled(t, "Commit")
@@ -2004,15 +2018,18 @@ func TestGetTransactionHistory(t *testing.T) {
 				Currency:     "USD",
 			},
 		}
+		expectedTotalCount := int64(len(expectedTransactions))
 
-		// Expect the default limit (10) and offset (0) to be used
-		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, 10, 0).Return(expectedTransactions, nil).Once()
+		// FIX: Change expected limit and offset to -5 and -10 respectively
+		mockTransactionRepo.On("GetTransactionsByWalletID", ctx, mockDBExecutor, walletID, -5, -10).Return(expectedTransactions, expectedTotalCount, nil).Once()
+		mockWalletRepo.On("GetWalletByID", ctx, mockDBExecutor, walletID).Return(&domain.Wallet{ID: walletID, Balance: decimal.Zero, Currency: "USD"}, nil).Once()
 
-		resTransactions, err := service.GetTransactionHistory(ctx, walletID, -5, -10) // Invalid limit/offset
+		resTransactions, totalCount, err := service.GetTransactionHistory(ctx, walletID, -5, -10) // Invalid limit/offset
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resTransactions)
 		assert.Equal(t, expectedTransactions, resTransactions)
+		assert.Equal(t, expectedTotalCount, totalCount)
 
 		mockDBBeginner.AssertNotCalled(t, "BeginTxx", mock.Anything, mock.Anything)
 		mockTxController.AssertNotCalled(t, "Commit")

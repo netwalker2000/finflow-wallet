@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	app "finflow-wallet/internal" // Corrected import path and alias
+	"finflow-wallet/internal/api/types"
 	"finflow-wallet/internal/domain"
 	// Import util for error checking
 )
@@ -307,51 +308,59 @@ func TestTransactionHistoryAndBalanceConsistency(t *testing.T) {
 	clearDatabase(t)
 	walletID := createTestUserAndWallet(t, "consistency_user", "USD", decimal.NewFromInt(0))
 
-	// Perform a series of operations.
+	// Perform a series of operations
 	depositAmount1 := decimal.NewFromFloat(500.00)
-	resp1, _ := makeRequest(t, "POST", fmt.Sprintf("/wallets/%d/deposit", walletID), strings.NewReader(fmt.Sprintf(`{"amount": "%s", "currency": "USD"}`, depositAmount1.String())))
-	defer resp1.Body.Close()
-	time.Sleep(10 * time.Millisecond)
+	respDeposit1, _ := makeRequest(t, "POST", fmt.Sprintf("/wallets/%d/deposit", walletID), strings.NewReader(fmt.Sprintf(`{"amount": "%s", "currency": "USD"}`, depositAmount1.String())))
+	defer respDeposit1.Body.Close()
+	time.Sleep(10 * time.Millisecond) // Ensure distinct transaction times
 
 	withdrawAmount := decimal.NewFromFloat(150.00)
-	resp2, _ := makeRequest(t, "POST", fmt.Sprintf("/wallets/%d/withdraw", walletID), strings.NewReader(fmt.Sprintf(`{"amount": "%s", "currency": "USD"}`, withdrawAmount.String())))
-	defer resp2.Body.Close()
+	respWithdraw, _ := makeRequest(t, "POST", fmt.Sprintf("/wallets/%d/withdraw", walletID), strings.NewReader(fmt.Sprintf(`{"amount": "%s", "currency": "USD"}`, withdrawAmount.String())))
+	defer respWithdraw.Body.Close()
 	time.Sleep(10 * time.Millisecond)
 
 	depositAmount2 := decimal.NewFromFloat(200.00)
-	resp3, _ := makeRequest(t, "POST", fmt.Sprintf("/wallets/%d/deposit", walletID), strings.NewReader(fmt.Sprintf(`{"amount": "%s", "currency": "USD"}`, depositAmount2.String())))
-	defer resp3.Body.Close()
+	respDeposit2, _ := makeRequest(t, "POST", fmt.Sprintf("/wallets/%d/deposit", walletID), strings.NewReader(fmt.Sprintf(`{"amount": "%s", "currency": "USD"}`, depositAmount2.String())))
+	defer respDeposit2.Body.Close()
 	time.Sleep(10 * time.Millisecond)
 
 	// Expected final balance: 0 + 500 - 150 + 200 = 550
-	expectedFinalBalance := decimal.NewFromFloat(550.00)
+	// FIX: Use NewFromString for precise decimal value in tests
+	expectedFinalBalance, errFmt := decimal.NewFromString("550.00")
+	require.NoError(t, errFmt, "Failed to parse expected final balance string")
 
-	// 1. Get current balance.
+	// 1. Get current balance
 	respBalance, bodyBalance := makeRequest(t, "GET", fmt.Sprintf("/wallets/%d/balance", walletID), nil)
 	defer respBalance.Body.Close()
 	assert.Equal(t, http.StatusOK, respBalance.StatusCode)
-	var balanceMap map[string]any
+	var balanceMap map[string]interface{}
 	err := json.Unmarshal([]byte(bodyBalance), &balanceMap)
 	require.NoError(t, err)
 	currentBalance, err := decimal.NewFromString(balanceMap["balance"].(string))
 	require.NoError(t, err)
-	assert.True(t, expectedFinalBalance.Equal(currentBalance), "Current balance should match expected final balance") // <-- 修改这里
+	assert.Equal(t, expectedFinalBalance, currentBalance, "Current balance should match expected final balance")
 
-	// 2. Get transaction history.
+	// 2. Get transaction history
 	respHistory, bodyHistory := makeRequest(t, "GET", fmt.Sprintf("/wallets/%d/transactions?limit=10&offset=0", walletID), nil)
 	defer respHistory.Body.Close()
 	assert.Equal(t, http.StatusOK, respHistory.StatusCode)
-	var historyMap map[string]any
-	err = json.Unmarshal([]byte(bodyHistory), &historyMap)
+
+	// Unmarshal the response into the generic PaginatedResponse struct
+	var historyResponse types.PaginatedResponse[map[string]interface{}]
+	err = json.Unmarshal([]byte(bodyHistory), &historyResponse)
 	require.NoError(t, err)
 
-	transactionsData := historyMap["data"].([]any)
+	transactionsData := historyResponse.Data
 	assert.Len(t, transactionsData, 3, "Should have 3 transactions")
+	assert.Equal(t, 10, historyResponse.Limit)
+	assert.Equal(t, 0, historyResponse.Offset)
+	assert.Equal(t, int64(3), historyResponse.TotalCount, "Total count should be 3") // Assert TotalCount
 
-	// 3. Calculate balance from transaction history.
+	// 3. Calculate balance from transaction history
 	calculatedBalanceFromHistory := decimal.NewFromInt(0) // Start calculation from 0
-	for _, txInterface := range transactionsData {
-		txMap := txInterface.(map[string]any)
+	// Iterate through the transactions. Each 'txMap' is already of type map[string]interface{}.
+	// No further type assertion is needed here.
+	for _, txMap := range transactionsData {
 		amountStr := txMap["amount"].(string)
 		txType := txMap["type"].(string)
 
@@ -364,6 +373,8 @@ func TestTransactionHistoryAndBalanceConsistency(t *testing.T) {
 		case domain.TransactionTypeWithdrawal:
 			calculatedBalanceFromHistory = calculatedBalanceFromHistory.Sub(amount)
 		case domain.TransactionTypeTransfer:
+			// For transfers, determine if it's an outgoing or incoming transfer
+			// Note: This assumes all transactions are related to the current walletID
 			if txMap["from_wallet_id"] != nil && int64(txMap["from_wallet_id"].(float64)) == walletID {
 				calculatedBalanceFromHistory = calculatedBalanceFromHistory.Sub(amount)
 			} else if txMap["to_wallet_id"] != nil && int64(txMap["to_wallet_id"].(float64)) == walletID {
@@ -372,6 +383,6 @@ func TestTransactionHistoryAndBalanceConsistency(t *testing.T) {
 		}
 	}
 
-	// 4. Compare the two balances for consistency.
-	assert.True(t, currentBalance.Equal(calculatedBalanceFromHistory), "Balance derived from history should match current balance") // <-- 修改这里
+	// 4. Compare the two balances
+	assert.Equal(t, currentBalance, calculatedBalanceFromHistory, "Balance derived from history should match current balance")
 }
