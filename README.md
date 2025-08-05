@@ -397,7 +397,6 @@ While this project provides a solid foundation, there are several areas where it
 *   **Observability:** Add metrics (e.g., Prometheus), tracing (e.g., OpenTelemetry), and more detailed structured logging to enhance monitoring and debugging capabilities in production.
 *   **Idempotency:** Implement idempotency keys for write operations (Deposit, Withdraw, Transfer) to prevent duplicate processing of requests due to network retries.
 *   **More Granular Error Handling:** Define more specific custom error types and map them to HTTP status codes for a richer API error response.
-*   **Integration Tests:** Develop a suite of integration tests that interact with a real (or test-containerized) PostgreSQL instance to verify the full stack's functionality.
 *   **Configuration Management:** Explore more advanced configuration management solutions (e.g., Viper) to support different environments (development, staging, production) and external configuration sources.
 *   **Concurrency Control:** For extremely high-volume scenarios, consider more advanced concurrency control mechanisms beyond simple database transactions, such as optimistic locking or distributed locks, though for typical loads, database transactions are sufficient.
 *   **User Management API:** Implement API endpoints for user creation, retrieval, and management, rather than assuming manual user creation.
@@ -417,8 +416,12 @@ The development of this project involved the following time allocation:
     *   13:00 - 14:00 (1 hour): Ensuring service layer build stability and passing all unit tests.
     *   14:00 - 15:00 (1 hour): Completion of all core code (config, app init, API handlers, main) and successful integration testing.
     *   15:00 - 16:30 (1.5 hours): README documentation, including API endpoints and testing sections.
+*   **August 4, 2025:**
+    *   15:30 - 20:00 (4.5 hours): Research and development for project-related enhancements; implemented integration test automation and performed both automated and manual testing.
+*   **August 5, 2025:**
+    *   10:00 - 13:00 (3 hours): Continued project refinement, specifically optimizing pagination design.
 
-**Total Estimated Time: 13 hours**
+**Total Estimated Time: about 20 hours**
 
 ## Features Not Implemented
 
@@ -453,12 +456,9 @@ To effectively review the codebase, it's recommended to follow the application's
     *   `internal/repository/postgres/*.go`: Review the concrete PostgreSQL implementations. Note how `sqlx.ExtContext` is used to allow repository methods to operate within an existing transaction.
 7.  **Check `pkg/db/`:** Understand the abstraction for database connection and transaction management. The `TxController` and `DBTxBeginner` interfaces are crucial for testability.
 8.  **Review `internal/util/errors.go`:** Understand the custom error types used for business logic errors.
-9.  **Examine Unit Tests (`internal/service/*_test.go`):**
-    *   See how `testify/mock` is used to mock dependencies, especially for repositories and transaction controllers.
-    *   Verify that each test case (`t.Run`) is isolated and sets up its own mocks.
-    *   Confirm that expected method calls and their arguments are asserted.
-    *   Understand how different error scenarios are tested.
-
+9.  **Examine Tests:**
+    *   **Unit Tests (`internal/service/*_test.go`):** See how `testify/mock` is used to mock dependencies, especially for repositories and transaction controllers. Verify that each test case (`t.Run`) is isolated and sets up its own mocks. Confirm that expected method calls and their arguments are asserted. Understand how different error scenarios are tested.
+    *   **Integration Tests (`internal/api/api_integration_test.go`):** Review how the entire API is tested end-to-end, interacting with a real database. Observe how HTTP requests are simulated and responses are validated, ensuring the system behaves correctly as a whole. Pay attention to the setup and teardown of the test environment (e.g., database clearing).
 
 ## Issue fixed:
 
