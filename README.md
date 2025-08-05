@@ -103,11 +103,8 @@ Ensure the PostgreSQL container is running.
 # Install migrate CLI if you haven't already
 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
-# Run migrations
+# Run migrations, including create table and insert data
 migrate -path migrations -database "postgres://user:password@localhost:5432/walletdb?sslmode=disable" up
-
-# Insert test data
-docker exec -i finflow_postgres psql -U user -d walletdb < migrations/000001_insert_test_data.sql
 
 # query test data
 docker exec -it finflow_postgres psql -U user -d walletdb
@@ -362,7 +359,7 @@ For quick functional checks or debugging, you can interact with the running appl
     curl -X POST -H "Content-Type: application/json" -d '{"amount": "50.00", "currency": "USD"}' http://localhost:8080/wallets/1/withdraw
 
     # Transfer money
-    curl -X POST -H "Content-Type: application/json" -d '{"from_wallet_id": 1, "to_wallet_id": 2, "amount": "25.00", "currency": "USD"}' http://localhost:8080/transfers
+    curl -X POST -H "Content-Type: application/json" -d '{"from_wallet_id": 1, "to_wallet_id": 3, "amount": "25.00", "currency": "USD"}' http://localhost:8080/transfers
 
     # Get transaction history
     curl http://localhost:8080/wallets/1/transactions
