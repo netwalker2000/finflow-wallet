@@ -32,7 +32,7 @@ func NewWalletHandler(svc service.WalletService, logger *slog.Logger) *WalletHan
 }
 
 // Helper function to send JSON responses.
-func (h *WalletHandler) respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func (h *WalletHandler) respondWithJSON(w http.ResponseWriter, code int, payload any) {
 	response, err := json.Marshal(payload)
 	if err != nil {
 		h.logger.Error("Failed to marshal JSON response", "error", err)
@@ -111,10 +111,10 @@ func (h *WalletHandler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, map[string]interface{}{
+	h.respondWithJSON(w, http.StatusOK, map[string]any{
 		"message":        "Deposit successful",
 		"wallet_id":      wallet.ID,
-		"new_balance":    wallet.Balance,
+		"new_balance":    wallet.Balance.StringFixed(2),
 		"transaction_id": transaction.ID,
 	})
 }
@@ -157,10 +157,10 @@ func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, map[string]interface{}{
+	h.respondWithJSON(w, http.StatusOK, map[string]any{
 		"message":        "Withdrawal successful",
 		"wallet_id":      wallet.ID,
-		"new_balance":    wallet.Balance,
+		"new_balance":    wallet.Balance.StringFixed(2),
 		"transaction_id": transaction.ID,
 	})
 }
@@ -196,17 +196,18 @@ func (h *WalletHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fromWallet, toWallet, transaction, err := h.service.Transfer(r.Context(), req.FromWalletID, req.ToWalletID, req.Amount, req.Currency)
+	fromWallet, _, transaction, err := h.service.Transfer(r.Context(), req.FromWalletID, req.ToWalletID, req.Amount, req.Currency)
 	if err != nil {
 		h.respondWithError(w, err)
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, map[string]interface{}{
+	h.respondWithJSON(w, http.StatusOK, map[string]any{
 		"message":                 "Transfer successful",
 		"transaction_id":          transaction.ID,
-		"from_wallet_new_balance": fromWallet.Balance,
-		"to_wallet_new_balance":   toWallet.Balance,
+		"from_wallet_new_balance": fromWallet.Balance.StringFixed(2),
+		//ignore to_wallet_new_balance for security reasons, you don't want to expose the balance passively
+		//"to_wallet_new_balance":   toWallet.Balance.StringFixed(2),
 	})
 }
 
@@ -226,9 +227,9 @@ func (h *WalletHandler) GetWalletBalance(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, map[string]interface{}{
+	h.respondWithJSON(w, http.StatusOK, map[string]any{
 		"wallet_id": wallet.ID,
-		"balance":   wallet.Balance,
+		"balance":   wallet.Balance.StringFixed(2),
 		"currency":  wallet.Currency,
 	})
 }
@@ -262,9 +263,25 @@ func (h *WalletHandler) GetTransactionHistory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	formattedTransactions := make([]map[string]any, len(transactions))
+	for i, tx := range transactions {
+		formattedTransactions[i] = map[string]any{
+			"id":               tx.ID,
+			"from_wallet_id":   tx.FromWalletID,
+			"to_wallet_id":     tx.ToWalletID,
+			"amount":           tx.Amount.StringFixed(2), // Use StringFixed for consistent formatting
+			"currency":         tx.Currency,
+			"type":             tx.Type,
+			"status":           tx.Status,
+			"transaction_time": tx.TransactionTime,
+			"description":      tx.Description,
+			"created_at":       tx.CreatedAt,
+		}
+	}
+
 	// For simplicity, total count is not returned here, but can be added if needed
-	h.respondWithJSON(w, http.StatusOK, map[string]interface{}{
-		"data":   transactions,
+	h.respondWithJSON(w, http.StatusOK, map[string]any{
+		"data":   formattedTransactions,
 		"limit":  limit,
 		"offset": offset,
 	})

@@ -267,10 +267,11 @@ The application exposes the following RESTful API endpoints:
         {
             "message": "Transfer successful",
             "transaction_id": 103,
-            "from_wallet_new_balance": "525.00",
-            "to_wallet_new_balance": "25.00"
+            "from_wallet_new_balance": "525.00"
         }
         ```
+    *   **Note:** 
+        * we ignore to_wallet_new_balance for security reasons, you don't want to expose the balance passively   
     *   **Error Response:** 
         * If wallet does not exist - "Resource not found"
         * If ID input format error - "invalid input provided"
