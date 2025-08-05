@@ -149,7 +149,7 @@ func TestDepositIntegration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		var responseMap map[string]interface{}
+		var responseMap map[string]any
 		err := json.Unmarshal([]byte(body), &responseMap)
 		require.NoError(t, err)
 
@@ -164,7 +164,7 @@ func TestDepositIntegration(t *testing.T) {
 		respGet, bodyGet := makeRequest(t, "GET", fmt.Sprintf("/wallets/%d/balance", walletID), nil)
 		defer respGet.Body.Close()
 		assert.Equal(t, http.StatusOK, respGet.StatusCode)
-		var balanceMap map[string]interface{}
+		var balanceMap map[string]any
 		err = json.Unmarshal([]byte(bodyGet), &balanceMap)
 		require.NoError(t, err)
 		retrievedBalance, err := decimal.NewFromString(balanceMap["balance"].(string))
@@ -209,7 +209,7 @@ func TestDepositIntegration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		var responseMap map[string]interface{}
+		var responseMap map[string]any
 		err := json.Unmarshal([]byte(body), &responseMap)
 		require.NoError(t, err)
 
@@ -233,7 +233,7 @@ func TestWithdrawIntegration(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		var responseMap map[string]interface{}
+		var responseMap map[string]any
 		err := json.Unmarshal([]byte(body), &responseMap)
 		require.NoError(t, err)
 
@@ -268,7 +268,7 @@ func TestTransferIntegration(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		var responseMap map[string]interface{}
+		var responseMap map[string]any
 		err := json.Unmarshal([]byte(body), &responseMap)
 		require.NoError(t, err)
 
@@ -330,7 +330,7 @@ func TestTransactionHistoryAndBalanceConsistency(t *testing.T) {
 	respBalance, bodyBalance := makeRequest(t, "GET", fmt.Sprintf("/wallets/%d/balance", walletID), nil)
 	defer respBalance.Body.Close()
 	assert.Equal(t, http.StatusOK, respBalance.StatusCode)
-	var balanceMap map[string]interface{}
+	var balanceMap map[string]any
 	err := json.Unmarshal([]byte(bodyBalance), &balanceMap)
 	require.NoError(t, err)
 	currentBalance, err := decimal.NewFromString(balanceMap["balance"].(string))
@@ -341,17 +341,17 @@ func TestTransactionHistoryAndBalanceConsistency(t *testing.T) {
 	respHistory, bodyHistory := makeRequest(t, "GET", fmt.Sprintf("/wallets/%d/transactions?limit=10&offset=0", walletID), nil)
 	defer respHistory.Body.Close()
 	assert.Equal(t, http.StatusOK, respHistory.StatusCode)
-	var historyMap map[string]interface{}
+	var historyMap map[string]any
 	err = json.Unmarshal([]byte(bodyHistory), &historyMap)
 	require.NoError(t, err)
 
-	transactionsData := historyMap["data"].([]interface{})
+	transactionsData := historyMap["data"].([]any)
 	assert.Len(t, transactionsData, 3, "Should have 3 transactions")
 
 	// 3. Calculate balance from transaction history.
 	calculatedBalanceFromHistory := decimal.NewFromInt(0) // Start calculation from 0
 	for _, txInterface := range transactionsData {
-		txMap := txInterface.(map[string]interface{})
+		txMap := txInterface.(map[string]any)
 		amountStr := txMap["amount"].(string)
 		txType := txMap["type"].(string)
 

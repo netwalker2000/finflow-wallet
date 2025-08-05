@@ -23,22 +23,22 @@ type MockDBExecutor struct {
 	mock.Mock
 }
 
-func (m *MockDBExecutor) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+func (m *MockDBExecutor) GetContext(ctx context.Context, dest any, query string, args ...any) error {
 	argsCalled := m.Called(ctx, dest, query, args)
 	return argsCalled.Error(0)
 }
 
-func (m *MockDBExecutor) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+func (m *MockDBExecutor) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
 	argsCalled := m.Called(ctx, dest, query, args)
 	return argsCalled.Error(0)
 }
 
-func (m *MockDBExecutor) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (m *MockDBExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	argsCalled := m.Called(ctx, query, args)
 	return argsCalled.Get(0).(sql.Result), argsCalled.Error(1)
 }
 
-func (m *MockDBExecutor) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+func (m *MockDBExecutor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	m.Called(ctx, query, args)
 	return &sql.Row{}
 }
