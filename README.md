@@ -448,3 +448,10 @@ To effectively review the codebase, it's recommended to follow the application's
     *   Verify that each test case (`t.Run`) is isolated and sets up its own mocks.
     *   Confirm that expected method calls and their arguments are asserted.
     *   Understand how different error scenarios are tested.
+
+
+## Issue fixed:
+
+1.  **API Response Amount Formatting:** Implemented consistent balance or amount formatting in API responses (e.g., `650.00` instead of `650`). This required adjustments to integration tests to validate the new string format, while unit tests remain unaffected.
+2.  **Enhanced Currency Mismatch Error Handling:** Improved error handling for `deposit`, `withdraw`, and `transfer` operations. Previously, currency mismatches resulted in a generic "Internal server error"; now, these are explicitly caught with a more informative "Wallet currency mismatch" message.
+3.  **Variable Name Refactoring:** Reviewed and updated several program variable names for improved clarity and readability.    
