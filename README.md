@@ -244,12 +244,19 @@ go run cmd/api/main.go
                 }
             ],
             "limit": 10,
-            "offset": 0
+            "offset": 0,
+            "total_count": 25 
         }
         ```
     *   **Error Response:** 
         * If wallet does not exist - "Resource not found"
         * If ID input format error - "invalid input provided"
+    *   **How to implement pagination on the frontend:**
+        * `data`: The array of transaction objects for the current page.
+        * `limit`: The maximum number of items requested per page.
+        * `offset`: The number of items skipped from the beginning, indicating the starting point of the current page.
+        * `total_count`: The total number of available transactions for the given wallet, across all pages.
+        * Frontend applications can use `total_count` along with `limit` to calculate the total number of pages **(ceil(total_count / limit))**. Users can then navigate between pages by adjusting the `offset` query parameter (e.g., offset = page_number * limit)
 
 ### Transfer Operations
 
