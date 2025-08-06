@@ -420,6 +420,8 @@ The development of this project involved the following time allocation:
 
 **Total Estimated Time: about 20 hours**
 
+**Although I spent tons of time on this take home test, but I think it worths, bcs it gives me a sense how their real projects work, and I'm proud to say I passed this test and advanced to next round. (20250806)**
+
 ## Features Not Implemented
 
 Due to the scope and time constraints, the following features, which are common in a production-grade wallet application, were not implemented:
